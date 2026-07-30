@@ -2,7 +2,19 @@
   "name": "opencode-subagent-watch",
   "version": "0.1.0",
   "description": "OpenCode TUI plugin for monitoring subagent activity",
+  "keywords": [
+    "opencode",
+    "plugin",
+    "subagent",
+    "tui"
+  ],
+  "homepage": "https://github.com/darcien/opencode-subagent-watch#readme",
+  "bugs": "https://github.com/darcien/opencode-subagent-watch/issues",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darcien/opencode-subagent-watch.git"
+  },
   "files": [
     "dist"
   ],
@@ -11,6 +23,9 @@
     "./tui": {
       "import": "./dist/tui.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "bun scripts/build.ts",
@@ -24,7 +39,7 @@
     "precommit:typecheck": "bun run typecheck",
     "precommit:test": "bun test",
     "precommit": "bun run fmt && bun run --parallel --no-exit-on-error 'precommit:*'",
-    "check": "bun run precommit && bun run build && bun scripts/smoke-package.ts"
+    "check": "bun run fmt:check && bun run --parallel --no-exit-on-error 'precommit:*' && bun run build && bun scripts/smoke-package.ts"
   },
   "devDependencies": {
     "@opencode-ai/plugin": "1.18.9",

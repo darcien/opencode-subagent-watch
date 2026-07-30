@@ -62,7 +62,7 @@ bun run build
 ## Checks
 
 - `bun run precommit`: format, lint, typecheck, and test.
-- `bun run check`: precommit checks plus build and package smoke test.
+- `bun run check`: check formatting, lint, typecheck, test, build, and package.
 
 For plugin load diagnostics:
 
