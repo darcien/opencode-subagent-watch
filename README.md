@@ -32,16 +32,20 @@ In my workflow, this often happens when I have multiple reviewers running.
 
 ## Install
 
+<!-- x-release-please-start-version -->
+
 ```bash
 # Latest
 opencode plugin --global opencode-subagent-watch@latest
 
 # Pinned
-opencode plugin --global opencode-subagent-watch@0.1.0
+opencode plugin --global opencode-subagent-watch@0.2.1
 
 # Upgrade a pinned install
-opencode plugin --global --force opencode-subagent-watch@0.2.0
+opencode plugin --global --force opencode-subagent-watch@0.2.1
 ```
+
+<!-- x-release-please-end -->
 
 Restart OpenCode after installation or upgrade.
 
