@@ -2,6 +2,10 @@
 
 OpenCode TUI plugin for monitoring subagent activity.
 
+<img src="./assets/subagents.png" alt="Subagent activity panel in the OpenCode sidebar" width="500">
+
+Example states:
+
 ```text
 * busy · Locate authentication flow
   explore · grep 8s ago
