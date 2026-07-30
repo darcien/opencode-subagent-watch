@@ -185,7 +185,7 @@ describe("responsive lines", () => {
 
   test("uses full header labels with middle-dot separators", () => {
     expect(headerLine({ total: 14, active: 2, errors: 1 }, false, 80)).toBe(
-      "▼ Subagents · 14 total · 2 active · 1 error",
+      "▼ Subagents · 2 active · 1 error · 14 total",
     );
     expect(headerLine({ total: 0, active: 0, errors: 0 }, false, 80)).toBe("▼ Subagents · none");
   });

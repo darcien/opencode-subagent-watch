@@ -260,9 +260,9 @@ export function headerLine(
   const arrow = collapsed ? "▶" : "▼";
   if (summary.total === 0 && !stale) return truncateWidth(`${arrow} Subagents · none`, width);
   const counts = [
-    `${summary.total} total`,
     summary.active ? `${summary.active} active` : "",
     summary.errors ? `${summary.errors} error` : "",
+    `${summary.total} total`,
     stale ? "stale" : "",
   ].filter(Boolean);
   return truncateWidth(`${arrow} Subagents · ${counts.join(" · ")}`, width);
