@@ -37,7 +37,7 @@
     "typecheck": "tsc --noEmit",
     "precommit:lint": "bun run lint",
     "precommit:typecheck": "bun run typecheck",
-    "precommit:test": "bun test",
+    "precommit:test": "bun test --only-failures",
     "precommit": "bun run fmt && bun run --parallel --no-exit-on-error 'precommit:*'",
     "check": "bun run fmt:check && bun run --parallel --no-exit-on-error 'precommit:*' && bun run build && bun scripts/smoke-package.ts"
   },
