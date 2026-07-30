@@ -2,6 +2,10 @@
 
 OpenCode TUI plugin for monitoring subagent activity.
 
+The built-in view is fine for short-lived subagents.
+When several run at once, it is easy to lose track of them.
+This plugin adds a sidebar panel that keeps recent subagents visible at a glance.
+
 <img src="./assets/subagents.png" alt="Subagent activity panel in the OpenCode sidebar" width="500">
 
 Example states:
@@ -23,12 +27,21 @@ Example states:
 
 Tested with OpenCode 1.18.9.
 
-## Why
+## Why create this slop?
 
-I need more visibility when using subagents with OpenCode.
-The built-in view is fine when you have only a few short-lived subagents.
-But when several are running at once, it is easy to lose track of them.
-In my workflow, this often happens when I have multiple reviewers running.
+I'm on the verge of switching to the Pi harness,
+but don't want to rebuild what OpenCode already provides right now.
+
+## Why would I install this over a bajillion other vibe-coded plugins out there?
+
+This plugin is minimal in all aspects, and I will keep it that way.
+
+```shell
+$ du -sh dist/
+ 32K    dist/
+```
+
+Also, no dependencies, ever.
 
 ## Install
 
