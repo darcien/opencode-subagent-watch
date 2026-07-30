@@ -5,7 +5,7 @@ OpenCode TUI plugin for monitoring subagent activity.
 ```text
 * busy · Locate authentication flow
   explore · grep 8s ago
-  run >=2m · $0.14
+  run 2m · $0.14
 ~ retry · Fix flaky tests
   builder · active
   run 40s
@@ -25,6 +25,21 @@ I need more visibility when using subagents with OpenCode.
 The built-in view is fine when you have only a few short-lived subagents.
 But when several are running at once, it is easy to lose track of them.
 In my workflow, this often happens when I have multiple reviewers running.
+
+## Install
+
+```bash
+# Latest
+opencode plugin --global opencode-subagent-watch@latest
+
+# Pinned
+opencode plugin --global opencode-subagent-watch@0.1.0
+
+# Upgrade a pinned install
+opencode plugin --global --force opencode-subagent-watch@0.2.0
+```
+
+Restart OpenCode after installation or upgrade.
 
 ## Local development
 
