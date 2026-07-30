@@ -39,10 +39,10 @@ In my workflow, this often happens when I have multiple reviewers running.
 opencode plugin --global opencode-subagent-watch@latest
 
 # Pinned
-opencode plugin --global opencode-subagent-watch@0.2.1
+opencode plugin --global opencode-subagent-watch@0.3.0
 
 # Upgrade a pinned install
-opencode plugin --global --force opencode-subagent-watch@0.2.1
+opencode plugin --global --force opencode-subagent-watch@0.3.0
 ```
 
 <!-- x-release-please-end -->
