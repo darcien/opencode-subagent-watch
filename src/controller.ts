@@ -2,7 +2,7 @@ import type { Session, SessionStatus } from "@opencode-ai/sdk/v2";
 import {
   type ChildRecord,
   normalizeStatus,
-  observeInitiallyActive,
+  startObservedTiming,
   retainError,
   updateStatus,
 } from "./model";
@@ -80,7 +80,7 @@ function reconcile(
       const base: ChildRecord = previous
         ? { ...previous, session: currentSession }
         : { session, status: normalizeStatus(status) };
-      const record = previous ? updateStatus(base, status, now) : observeInitiallyActive(base, now);
+      const record = previous ? updateStatus(base, status, now) : startObservedTiming(base, now);
       return [session.id, record];
     });
   const baseline = new Map<string, ChildRecord>([...retained, ...fetched]);
@@ -234,9 +234,7 @@ export class ChildController {
     const base: ChildRecord = previous
       ? { ...previous, session }
       : { session, status: normalizeStatus(status) };
-    const identified = previous
-      ? updateStatus(base, status, now)
-      : observeInitiallyActive(base, now);
+    const identified = previous ? updateStatus(base, status, now) : startObservedTiming(base, now);
     const related = this.pending.filter((event) => event.sessionID === session.id);
     this.records = related.reduce(applyLifecycle, setRecord(this.records, identified));
     this.pending = this.pending.filter((event) => event.sessionID !== session.id);

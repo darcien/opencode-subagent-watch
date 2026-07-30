@@ -39,7 +39,9 @@ describe("ChildController", () => {
     await tick();
     expect([...controller.snapshot().children.keys()]).toEqual(["a"]);
     expect(displayStatus(controller.snapshot().children.get("a")!)).toBe("busy");
-    expect(controller.snapshot().children.get("a")!.timing?.lowerBound).toBeTrue();
+    expect(controller.snapshot().children.get("a")!.timing).toEqual({
+      startedAt: expect.any(Number),
+    });
     controller.dispose();
   });
 
@@ -121,7 +123,7 @@ describe("ChildController", () => {
     await tick();
     const value = controller.snapshot().children.get("a")!;
     expect(displayStatus(value)).toBe("error");
-    expect(value.timing).toEqual({ startedAt: 10, endedAt: 20, lowerBound: false });
+    expect(value.timing).toEqual({ startedAt: 10, endedAt: 20 });
     controller.dispose();
   });
 
@@ -255,7 +257,7 @@ describe("ChildController", () => {
     await tick();
     const value = controller.snapshot().children.get("a")!;
     expect(displayStatus(value)).toBe("idle");
-    expect(value.timing).toEqual({ startedAt: 10, endedAt: 20, lowerBound: false });
+    expect(value.timing).toEqual({ startedAt: 10, endedAt: 20 });
     controller.dispose();
   });
 
@@ -404,7 +406,7 @@ describe("ChildController", () => {
     await tick();
     const restored = controller.snapshot().children.get("a")!;
     expect(displayStatus(restored)).toBe("error");
-    expect(restored.timing).toEqual({ startedAt: 10, endedAt: 20, lowerBound: false });
+    expect(restored.timing).toEqual({ startedAt: 10, endedAt: 20 });
     controller.dispose();
   });
 

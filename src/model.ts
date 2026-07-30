@@ -6,7 +6,6 @@ export type DisplayStatus = ActiveStatus | "idle" | "error";
 export type RunTiming = {
   startedAt: number;
   endedAt?: number;
-  lowerBound: boolean;
 };
 
 export type ActivityObservation = {
@@ -58,7 +57,7 @@ export function transitionTiming(
 ): RunTiming | undefined {
   const wasActive = isActive(previous);
   const active = isActive(next);
-  if (active && !wasActive) return { startedAt: now, lowerBound: false };
+  if (active && !wasActive) return { startedAt: now };
   if (!active && wasActive && timing) return { ...timing, endedAt: now };
   return timing;
 }
@@ -80,9 +79,9 @@ export function updateStatus(
   };
 }
 
-export function observeInitiallyActive(child: ChildRecord, now: number): ChildRecord {
+export function startObservedTiming(child: ChildRecord, now: number): ChildRecord {
   if (!isActive(child.status) || child.timing) return child;
-  return { ...child, timing: { startedAt: now, lowerBound: true } };
+  return { ...child, timing: { startedAt: now } };
 }
 
 export function retainError(child: ChildRecord, now: number): ChildRecord {
@@ -226,7 +225,7 @@ export function formatDuration(timing: RunTiming | undefined, now: number): stri
     const minutes = Math.floor((seconds % 3600) / 60);
     value = minutes ? `${hours}h ${minutes}m` : `${hours}h`;
   }
-  return timing.lowerBound ? `>=${value}` : value;
+  return value;
 }
 
 export function formatCost(cost: number | undefined): string | undefined {
@@ -281,10 +280,7 @@ export function formatActivity(
   now: number,
 ): string | undefined {
   if (!activity) return;
-  const age = formatDuration(
-    { startedAt: activity.observedAt, endedAt: now, lowerBound: false },
-    now,
-  );
+  const age = formatDuration({ startedAt: activity.observedAt, endedAt: now }, now);
   return `${sanitizeText(activity.label)} ${age} ago`;
 }
 

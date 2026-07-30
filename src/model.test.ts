@@ -8,7 +8,7 @@ import {
   displayTitle,
   formatDuration,
   headerLine,
-  observeInitiallyActive,
+  startObservedTiming,
   retainError,
   resolveSessionModel,
   rowLines,
@@ -94,7 +94,7 @@ describe("lifecycle", () => {
   test("times repeated runs and clears retained errors on restart", () => {
     let value = child("a");
     value = updateStatus(value, { type: "busy" }, 1_000);
-    expect(value.timing).toEqual({ startedAt: 1_000, lowerBound: false });
+    expect(value.timing).toEqual({ startedAt: 1_000 });
     value = retainError(value, 4_000);
     expect(displayStatus(value)).toBe("error");
     expect(formatDuration(value.timing, 9_000)).toBe("3s");
@@ -104,12 +104,12 @@ describe("lifecycle", () => {
       7_000,
     );
     expect(value.errorAt).toBeUndefined();
-    expect(value.timing).toEqual({ startedAt: 7_000, lowerBound: false });
+    expect(value.timing).toEqual({ startedAt: 7_000 });
   });
 
-  test("marks initially observed active duration as lower bound", () => {
-    const value = observeInitiallyActive(child("a", { type: "busy" }), 1_000);
-    expect(formatDuration(value.timing, 61_000)).toBe(">=1m");
+  test("starts timing when an active child is first observed", () => {
+    const value = startObservedTiming(child("a", { type: "busy" }), 1_000);
+    expect(formatDuration(value.timing, 61_000)).toBe("1m");
   });
 });
 
@@ -166,7 +166,7 @@ describe("responsive lines", () => {
         cost: 0.14,
       },
     ),
-    timing: { startedAt: 0, lowerBound: false },
+    timing: { startedAt: 0 },
   };
 
   for (const width of [24, 32, 40]) {
