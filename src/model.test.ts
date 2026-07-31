@@ -8,6 +8,7 @@ import {
   displayTitle,
   formatDuration,
   headerLine,
+  headerSegments,
   startObservedTiming,
   retainError,
   resolveSessionModel,
@@ -188,6 +189,12 @@ describe("responsive lines", () => {
       "▼ Subagents · 2 active · 1 error · 14 total",
     );
     expect(headerLine({ total: 0, active: 0, errors: 0 }, false, 80)).toBe("▼ Subagents · none");
+    expect(headerSegments({ total: 14, active: 2, errors: 1 }, false, 80)).toEqual([
+      "▼ Subagents",
+      "2 active",
+      "1 error",
+      "14 total",
+    ]);
   });
 
   test("splits activity from run details so cost remains visible", () => {

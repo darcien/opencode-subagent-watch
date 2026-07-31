@@ -6,7 +6,7 @@ import { clearActivity, observeActivity, touchActivity, type ActivityMap } from 
 import { ChildController, type Snapshot } from "./controller";
 import {
   displayStatus,
-  headerLine,
+  headerSegments,
   isActive,
   resolveSessionModel,
   rowLines,
@@ -59,6 +59,15 @@ function View(props: {
       props.api.state.session.messages(props.sessionID),
     ),
   );
+  const summary = createMemo(() => summarize(props.snapshot().children.values()));
+  const header = createMemo(() =>
+    headerSegments(summary(), props.collapsed(), width(), props.snapshot().stale),
+  );
+  const headerColor = (segment: string) => {
+    if (segment.endsWith(" active")) return props.api.theme.current.success;
+    if (segment.endsWith(" error")) return props.api.theme.current.error;
+    return props.api.theme.current.textMuted;
+  };
 
   createEffect(() => {
     const hasVisibleActive = list().visible.some((child) => isActive(child.status));
@@ -83,17 +92,27 @@ function View(props: {
       flexDirection="column"
     >
       <box width="100%" onMouseUp={props.toggle}>
-        <text fg={props.api.theme.current.text}>
-          <b>
-            {props.snapshot().loadState === "ready"
-              ? headerLine(
-                  summarize(props.snapshot().children.values()),
-                  props.collapsed(),
-                  width(),
-                  props.snapshot().stale,
-                )
-              : truncateWidth(`${props.collapsed() ? "▶" : "▼"} Subagents`, width())}
-          </b>
+        <text>
+          <Show
+            when={props.snapshot().loadState === "ready"}
+            fallback={
+              <span style={{ fg: props.api.theme.current.text }}>
+                <b>{truncateWidth(`${props.collapsed() ? "▶" : "▼"} Subagents`, width())}</b>
+              </span>
+            }
+          >
+            <span style={{ fg: props.api.theme.current.text }}>
+              <b>{header()[0]}</b>
+            </span>
+            <For each={header().slice(1)}>
+              {(segment) => (
+                <>
+                  <span style={{ fg: props.api.theme.current.textMuted }}> · </span>
+                  <span style={{ fg: headerColor(segment) }}>{segment}</span>
+                </>
+              )}
+            </For>
+          </Show>
         </text>
       </box>
 

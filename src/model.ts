@@ -267,6 +267,15 @@ export function headerLine(
   return truncateWidth(`${arrow} Subagents · ${counts.join(" · ")}`, width);
 }
 
+export function headerSegments(
+  summary: Summary,
+  collapsed: boolean,
+  width: number,
+  stale = false,
+): string[] {
+  return headerLine(summary, collapsed, width, stale).split(" · ");
+}
+
 export type RowLines = {
   first: string;
   prefix: string;
