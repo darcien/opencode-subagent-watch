@@ -100,6 +100,14 @@ bun run build
 - `bun run precommit`: format, lint, typecheck, and test.
 - `bun run check`: check formatting, lint, typecheck, test, build, and package.
 
+Preview all sidebar states with the local demo provider:
+
+```bash
+bun run demo
+```
+
+Run `/demo` command, it will spawn deterministic subagents.
+
 For plugin load diagnostics:
 
 ```bash

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "enabled_providers": ["cafe"],
+  "plugin": [],
+  "default_agent": "demo",
+  "model": "cafe/house-blend",
+  "provider": {
+    "cafe": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "{env:CAFE_PROVIDER_URL}/v1",
+        "apiKey": "cafe",
+      },
+      "models": {
+        "house-blend": {},
+        "decaf": {
+          "cost": { "input": 10000, "output": 10000 },
+        },
+      },
+    },
+  },
+  "agent": {
+    "demo": {
+      "description": "Launches all status examples.",
+      "mode": "primary",
+      "permission": { "task": "allow" },
+    },
+    "brewer": {
+      "description": "Brews the morning coffee",
+      "mode": "subagent",
+      "steps": 1,
+    },
+    "taster": {
+      "description": "Tastes the espresso",
+      "mode": "subagent",
+      "model": "cafe/decaf",
+      "steps": 1,
+    },
+    "bean-scout": {
+      "description": "Finds the missing beans",
+      "mode": "subagent",
+      "steps": 1,
+    },
+    "latte-artist": {
+      "description": "Attempts latte art",
+      "mode": "subagent",
+      "steps": 1,
+    },
+  },
+  "command": {
+    "demo": {
+      "description": "Launch all status examples",
+      "template": "Launch all status examples.",
+    },
+  },
+}
