@@ -1,27 +1,30 @@
+/**
+ * Maintains direct-child subagent state across API responses and lifecycle events.
+ */
 import type { Session, SessionStatus } from "@opencode-ai/sdk/v2";
 import {
-  type ChildRecord,
   normalizeStatus,
   startObservedTiming,
   retainError,
+  type SubagentRecord,
   updateStatus,
-} from "./model";
+} from "./subagent";
 
 export type LoadState = "loading" | "ready" | "unavailable";
 
-export type Snapshot = {
+export type TrackerSnapshot = {
   parentID?: string;
-  children: ReadonlyMap<string, ChildRecord>;
+  children: ReadonlyMap<string, SubagentRecord>;
   loadState: LoadState;
   stale: boolean;
 };
 
-export type ControllerOptions = {
+export type TrackerOptions = {
   fetchChildren: (parentID: string) => Promise<Session[]>;
   status: (sessionID: string) => SessionStatus | undefined;
   now?: () => number;
   debounceMs?: number;
-  onChange?: (snapshot: Snapshot) => void;
+  onChange?: (snapshot: TrackerSnapshot) => void;
   log?: (level: "debug" | "warn", message: string) => void;
 };
 
@@ -30,23 +33,23 @@ type LifecycleEvent =
   | { type: "error"; sessionID: string; now: number };
 
 function setRecord(
-  records: ReadonlyMap<string, ChildRecord>,
-  record: ChildRecord,
-): Map<string, ChildRecord> {
+  records: ReadonlyMap<string, SubagentRecord>,
+  record: SubagentRecord,
+): Map<string, SubagentRecord> {
   return new Map(records).set(record.session.id, record);
 }
 
 function removeRecord(
-  records: ReadonlyMap<string, ChildRecord>,
+  records: ReadonlyMap<string, SubagentRecord>,
   sessionID: string,
-): Map<string, ChildRecord> {
+): Map<string, SubagentRecord> {
   return new Map([...records].filter(([id]) => id !== sessionID));
 }
 
 function applyLifecycle(
-  records: ReadonlyMap<string, ChildRecord>,
+  records: ReadonlyMap<string, SubagentRecord>,
   event: LifecycleEvent,
-): Map<string, ChildRecord> {
+): Map<string, SubagentRecord> {
   const previous = records.get(event.sessionID);
   if (!previous) return new Map(records);
   const next =
@@ -57,18 +60,18 @@ function applyLifecycle(
 }
 
 function reconcile(
-  records: ReadonlyMap<string, ChildRecord>,
+  records: ReadonlyMap<string, SubagentRecord>,
   parentID: string,
   sessions: readonly Session[],
   statuses: ReadonlyMap<string, SessionStatus>,
   pending: readonly LifecycleEvent[],
   now: number,
-): Map<string, ChildRecord> {
+): Map<string, SubagentRecord> {
   const retained = [...records].filter(([, record]) => record.session.parentID !== parentID);
   const pendingIDs = new Set(pending.map((event) => event.sessionID));
   const fetched = sessions
     .filter((session) => session.parentID === parentID)
-    .map((session): [string, ChildRecord] => {
+    .map((session): [string, SubagentRecord] => {
       const previous = records.get(session.id);
       const status = pendingIDs.has(session.id)
         ? (previous?.status ?? { type: "idle" })
@@ -77,31 +80,31 @@ function reconcile(
         previous && previous.session.time.updated > session.time.updated
           ? previous.session
           : session;
-      const base: ChildRecord = previous
+      const base: SubagentRecord = previous
         ? { ...previous, session: currentSession }
         : { session, status: normalizeStatus(status) };
       const record = previous ? updateStatus(base, status, now) : startObservedTiming(base, now);
       return [session.id, record];
     });
-  const baseline = new Map<string, ChildRecord>([...retained, ...fetched]);
+  const baseline = new Map<string, SubagentRecord>([...retained, ...fetched]);
   return pending.reduce(applyLifecycle, baseline);
 }
 
 function currentChildren(
-  records: ReadonlyMap<string, ChildRecord>,
+  records: ReadonlyMap<string, SubagentRecord>,
   members: ReadonlySet<string>,
-): Map<string, ChildRecord> {
+): Map<string, SubagentRecord> {
   return new Map(
     [...members]
       .map((id) => records.get(id))
-      .filter((record): record is ChildRecord => record !== undefined)
+      .filter((record): record is SubagentRecord => record !== undefined)
       .map((record) => [record.session.id, record]),
   );
 }
 
-export class ChildController {
+export class SubagentTracker {
   private parentID?: string;
-  private records = new Map<string, ChildRecord>();
+  private records = new Map<string, SubagentRecord>();
   private members = new Set<string>();
   private pending: LifecycleEvent[] = [];
   private deleted = new Map<string, string>();
@@ -116,12 +119,12 @@ export class ChildController {
   private readonly now: () => number;
   private readonly debounceMs: number;
 
-  constructor(private readonly options: ControllerOptions) {
+  constructor(private readonly options: TrackerOptions) {
     this.now = options.now ?? Date.now;
     this.debounceMs = options.debounceMs ?? 100;
   }
 
-  snapshot(): Snapshot {
+  snapshot(): TrackerSnapshot {
     return {
       parentID: this.parentID,
       children: currentChildren(this.records, this.members),
@@ -231,7 +234,7 @@ export class ChildController {
     if (membershipChanged) this.listGeneration++;
     const status = this.options.status(session.id);
     const now = this.now();
-    const base: ChildRecord = previous
+    const base: SubagentRecord = previous
       ? { ...previous, session }
       : { session, status: normalizeStatus(status) };
     const identified = previous ? updateStatus(base, status, now) : startObservedTiming(base, now);

@@ -1,19 +1,15 @@
 /** @jsxImportSource @opentui/solid */
+/**
+ * Connects OpenCode subscriptions to Solid state and terminal rendering.
+ */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui";
 import type { BoxRenderable, RGBA } from "@opentui/core";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { clearActivity, updateActivity, type ActivityMap } from "./activity";
-import { ChildController, type Snapshot } from "./controller";
-import {
-  displayStatus,
-  headerSegments,
-  isActive,
-  resolveSessionModel,
-  rowLines,
-  sortAndPrune,
-  summarize,
-  truncateWidth,
-} from "./model";
+import { SubagentTracker, type TrackerSnapshot } from "./tracker";
+import { headerSegments, resolveSessionModel, rowLines, sortAndPrune, summarize } from "./sidebar";
+import { displayStatus, isActive } from "./subagent";
+import { truncateWidth } from "./terminal-text";
 
 const PLUGIN_ID = "opencode-subagent-watch";
 const COLLAPSED_KEY = `${PLUGIN_ID}.collapsed`;
@@ -37,8 +33,8 @@ function statusColor(api: TuiPluginApi, status: ReturnType<typeof displayStatus>
 function View(props: {
   api: TuiPluginApi;
   sessionID: string;
-  controller: ChildController;
-  snapshot: () => Snapshot;
+  tracker: SubagentTracker;
+  snapshot: () => TrackerSnapshot;
   collapsed: () => boolean;
   activities: () => ActivityMap;
   toggle: () => void;
@@ -49,8 +45,8 @@ function View(props: {
   let root: BoxRenderable | undefined;
 
   createEffect(() => props.ensureKV());
-  if (props.snapshot().parentID === props.sessionID) void props.controller.refresh();
-  else void props.controller.setParent(props.sessionID);
+  if (props.snapshot().parentID === props.sessionID) void props.tracker.refresh();
+  else void props.tracker.setParent(props.sessionID);
 
   const list = createMemo(() => sortAndPrune(props.snapshot().children.values()));
   const parentModel = createMemo(() =>
@@ -177,7 +173,7 @@ function View(props: {
 }
 
 const tui: TuiPlugin = async (api) => {
-  const [snapshot, setSnapshot] = createSignal<Snapshot>({
+  const [snapshot, setSnapshot] = createSignal<TrackerSnapshot>({
     children: new Map(),
     loadState: "loading",
     stale: false,
@@ -186,7 +182,7 @@ const tui: TuiPlugin = async (api) => {
   const [activities, setActivities] = createSignal<ActivityMap>(new Map());
   let kvLoaded = false;
 
-  const controller = new ChildController({
+  const tracker = new SubagentTracker({
     fetchChildren: async (parentID) => {
       const response = await api.client.session.children({ sessionID: parentID });
       if (response.error) throw response.error;
@@ -212,22 +208,22 @@ const tui: TuiPlugin = async (api) => {
     if (api.kv.ready) api.kv.set(COLLAPSED_KEY, next);
   };
 
-  api.lifecycle.onDispose(() => controller.dispose());
+  api.lifecycle.onDispose(() => tracker.dispose());
 
-  api.event.on("session.created", (event) => controller.onCreated(event.properties.info));
-  api.event.on("session.updated", (event) => controller.onUpdated(event.properties.info));
+  api.event.on("session.created", (event) => tracker.onCreated(event.properties.info));
+  api.event.on("session.updated", (event) => tracker.onUpdated(event.properties.info));
   api.event.on("session.deleted", (event) => {
-    controller.onDeleted(event.properties.info);
+    tracker.onDeleted(event.properties.info);
     setActivities((value) => clearActivity(value, event.properties.sessionID));
   });
   api.event.on("session.status", (event) => {
-    controller.onStatus(event.properties.sessionID, event.properties.status);
+    tracker.onStatus(event.properties.sessionID, event.properties.status);
     if (event.properties.status.type === "idle") {
       setActivities((value) => clearActivity(value, event.properties.sessionID));
     }
   });
   api.event.on("session.error", (event) => {
-    controller.onError(event.properties.sessionID, event.properties.error);
+    tracker.onError(event.properties.sessionID, event.properties.error);
     if (event.properties.sessionID && event.properties.error) {
       setActivities((value) => clearActivity(value, event.properties.sessionID!));
     }
@@ -256,7 +252,7 @@ const tui: TuiPlugin = async (api) => {
           <View
             api={api}
             sessionID={props.session_id}
-            controller={controller}
+            tracker={tracker}
             snapshot={snapshot}
             collapsed={collapsed}
             activities={activities}

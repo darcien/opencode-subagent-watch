@@ -1,24 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import type { Session, SessionStatus } from "@opencode-ai/sdk/v2";
+import { displayWidth } from "./terminal-text";
 import {
-  type ChildRecord,
-  displayWidth,
   differingModel,
-  displayStatus,
   displayTitle,
   formatCost,
-  formatDuration,
   headerLine,
   headerSegments,
-  startObservedTiming,
-  retainError,
   resolveSessionModel,
   rowLines,
-  sanitizeText,
   sortAndPrune,
-  truncateWidth,
-  updateStatus,
-} from "./model";
+} from "./sidebar";
+import type { SubagentRecord } from "./subagent";
 
 function session(id: string, input: Partial<Session> = {}): Session {
   return {
@@ -37,7 +30,7 @@ function child(
   id: string,
   status: SessionStatus = { type: "idle" },
   input: Partial<Session> = {},
-): ChildRecord {
+): SubagentRecord {
   return { session: session(id, input), status };
 }
 
@@ -82,46 +75,6 @@ describe("display data", () => {
         resolveSessionModel(session("parent"), messages),
       ),
     ).toBeUndefined();
-  });
-
-  test("truncates by terminal display width without splitting graphemes", () => {
-    expect(truncateWidth("abcdef", 4)).toBe("abc…");
-    expect(truncateWidth("界界界", 5)).toBe("界界…");
-    expect(truncateWidth("👨‍👩‍👧‍👦 family", 4)).toBe("👨‍👩‍👧‍👦 …");
-    expect(displayWidth("🇮🇩")).toBe(2);
-    expect(displayWidth("1️⃣")).toBe(2);
-  });
-
-  test("strips invisible format controls without breaking emoji joins", () => {
-    expect(sanitizeText("safe\u200b\u202eevil")).toBe("safeevil");
-    expect(sanitizeText("safe\u200dtext")).toBe("safetext");
-    expect(sanitizeText("👨\u200dtext")).toBe("👨text");
-    expect(sanitizeText("👨‍👩‍👧‍👦")).toBe("👨‍👩‍👧‍👦");
-    expect(sanitizeText("🏴󠁧󠁢󠁳󠁣󠁴󠁿")).toBe("🏴󠁧󠁢󠁳󠁣󠁴󠁿");
-    expect(displayWidth("\u0301\u200d\ufe0f")).toBe(0);
-  });
-});
-
-describe("lifecycle", () => {
-  test("times repeated runs and clears retained errors on restart", () => {
-    let value = child("a");
-    value = updateStatus(value, { type: "busy" }, 1_000);
-    expect(value.timing).toEqual({ startedAt: 1_000 });
-    value = retainError(value, 4_000);
-    expect(displayStatus(value)).toBe("error");
-    expect(formatDuration(value.timing, 9_000)).toBe("3s");
-    value = updateStatus(
-      value,
-      { type: "retry", attempt: 1, message: "later", next: 8_000 },
-      7_000,
-    );
-    expect(value.errorAt).toBeUndefined();
-    expect(value.timing).toEqual({ startedAt: 7_000 });
-  });
-
-  test("starts timing when an active child is first observed", () => {
-    const value = startObservedTiming(child("a", { type: "busy" }), 1_000);
-    expect(formatDuration(value.timing, 61_000)).toBe("1m");
   });
 });
 

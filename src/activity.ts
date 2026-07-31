@@ -1,5 +1,12 @@
+/**
+ * Derives recent subagent activity from public part events.
+ */
 import type { Message, Part } from "@opencode-ai/sdk/v2";
-import type { ActivityObservation } from "./model";
+
+export type ActivityObservation = {
+  label: string;
+  observedAt: number;
+};
 
 export type ActivityMap = ReadonlyMap<string, ActivityObservation>;
 
