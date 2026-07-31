@@ -14,6 +14,7 @@ import {
   retainError,
   resolveSessionModel,
   rowLines,
+  sanitizeText,
   sortAndPrune,
   truncateWidth,
   updateStatus,
@@ -89,6 +90,15 @@ describe("display data", () => {
     expect(truncateWidth("👨‍👩‍👧‍👦 family", 4)).toBe("👨‍👩‍👧‍👦 …");
     expect(displayWidth("🇮🇩")).toBe(2);
     expect(displayWidth("1️⃣")).toBe(2);
+  });
+
+  test("strips invisible format controls without breaking emoji joins", () => {
+    expect(sanitizeText("safe\u200b\u202eevil")).toBe("safeevil");
+    expect(sanitizeText("safe\u200dtext")).toBe("safetext");
+    expect(sanitizeText("👨\u200dtext")).toBe("👨text");
+    expect(sanitizeText("👨‍👩‍👧‍👦")).toBe("👨‍👩‍👧‍👦");
+    expect(sanitizeText("🏴󠁧󠁢󠁳󠁣󠁴󠁿")).toBe("🏴󠁧󠁢󠁳󠁣󠁴󠁿");
+    expect(displayWidth("\u0301\u200d\ufe0f")).toBe(0);
   });
 });
 
@@ -198,20 +208,20 @@ describe("responsive lines", () => {
     ]);
   });
 
-  test("groups activity with run details and identity separately", () => {
+  test("groups activity with duration details and identity separately", () => {
     const lines = rowLines(value, undefined, 40, 600_000, {
       label: "grep",
       observedAt: 592_000,
     });
-    expect(lines.second).toBe("  grep 8s ago · run 10m · $0.14");
+    expect(lines.second).toBe("  grep 8s ago                    dur 10m");
     expect(lines.third).toBe("  investigator · provider/model");
     expect(rowLines(value, undefined, 12, 600_000).second).not.toContain("$0.…");
   });
 
   test.each([
-    [24, "  svel… 3s ago · run 10s", "  cavecrew-investigator"],
-    [32, "  svelte_get-d… 3s ago · run 10s", "  cavecrew-investigator · openr…"],
-    [40, "  svelte_get-documenta… 3s ago · run 10s", "  cavecrew-investigator · openrouter/de…"],
+    [24, "  svelt… 3s ago  dur 10s", "  cavecrew-investigator"],
+    [32, "  svelte_get-do… 3s ago  dur 10s", "  cavecrew-investigator · openr…"],
+    [40, "  svelte_get-documentat… 3s ago  dur 10s", "  cavecrew-investigator · openrouter/de…"],
   ] as const)("fits real long tool and agent data at width %i", (width, second, third) => {
     const real = {
       ...child(
@@ -242,9 +252,23 @@ describe("responsive lines", () => {
       ...child("settled", { type: "idle" }, { agent: "svelte-file-editor", cost: 90.8436 }),
       timing: { startedAt: 0, endedAt: 46_000 },
     };
-    expect(rowLines(settled, undefined, 24, 60_000).second).toBe("  run 46s · $90.84");
+    expect(rowLines(settled, undefined, 24, 60_000).second).toBe("  dur 46s · $90.84");
     expect(rowLines(settled, undefined, 24, 60_000).third).toBe("  svelte-file-editor");
     expect(formatCost(Number.POSITIVE_INFINITY)).toBeUndefined();
+  });
+
+  test("sanitizes differing model display text", () => {
+    const model = child(
+      "model",
+      { type: "idle" },
+      {
+        agent: "general",
+        model: { providerID: "unsafe\nprovider", id: "model\u202e" },
+      },
+    );
+    expect(rowLines(model, { providerID: "other", id: "model" }, 40, 0).third).toBe(
+      "  general · unsafe provider/model",
+    );
   });
 
   test("bounds every row line for all narrow widths", () => {
@@ -262,8 +286,8 @@ describe("responsive lines", () => {
   });
 
   test("shows runtime without redundant active fallback", () => {
-    expect(rowLines(value, undefined, 10, 600_000).second).toBe("  run 10m");
-    expect(rowLines(value, undefined, 32, 600_000).second).toBe("  run 10m · $0.14");
+    expect(rowLines(value, undefined, 10, 600_000).second).toBe("  dur 10m");
+    expect(rowLines(value, undefined, 32, 600_000).second).toBe("  dur 10m");
   });
 
   test("keeps activity label before runtime under tight width", () => {
@@ -273,6 +297,67 @@ describe("responsive lines", () => {
         observedAt: 592_000,
       }).second,
     ).toBe("  svelte_… 8s ago");
+    expect(
+      rowLines(value, undefined, 10, 600_000, {
+        label: "svelte_get-documentation",
+        observedAt: 592_000,
+      }).second,
+    ).toBe("  8s ago");
+  });
+
+  test("keeps operational suffix aligned across real activity labels", () => {
+    const labels = ["bash", "thinking", "webfetch", "svelte_get-documentation"];
+    const lines = labels.map(
+      (label) => rowLines(value, undefined, 40, 600_000, { label, observedAt: 592_000 }).second!,
+    );
+    const separatorColumns = lines.map((line) =>
+      displayWidth(line.slice(0, line.indexOf("dur 10m"))),
+    );
+    expect(new Set(separatorColumns).size).toBe(1);
+    expect(lines).toEqual([
+      "  bash 8s ago                    dur 10m",
+      "  thinking 8s ago                dur 10m",
+      "  webfetch 8s ago                dur 10m",
+      "  svelte_get-documentat… 8s ago  dur 10m",
+    ]);
+  });
+
+  test("pads activity by terminal display width", () => {
+    const ascii = rowLines(value, undefined, 32, 600_000, { label: "bash", observedAt: 592_000 });
+    const wide = rowLines(value, undefined, 32, 600_000, { label: "工具", observedAt: 592_000 });
+    expect(ascii.second?.indexOf("dur 10m")).not.toBe(wide.second?.indexOf("dur 10m"));
+    expect(displayWidth(ascii.second!.slice(0, ascii.second!.indexOf("dur 10m")))).toBe(
+      displayWidth(wide.second!.slice(0, wide.second!.indexOf("dur 10m"))),
+    );
+  });
+
+  test("aligns available operational suffix without inventing fields", () => {
+    const activity = { label: "bash", observedAt: 592_000 };
+    const noCost = { ...value, session: { ...value.session, cost: 0 } };
+    const noRuntime = { ...value, timing: undefined };
+    expect(rowLines(noCost, undefined, 32, 600_000, activity).second).toBe(
+      "  bash 8s ago            dur 10m",
+    );
+    expect(rowLines(noRuntime, undefined, 32, 600_000, activity).second).toBe("  bash 8s ago");
+    expect(rowLines(noRuntime, undefined, 12, 600_000, activity).second).toBe("  ba… 8s ago");
+  });
+
+  test("keeps active layout stable as cumulative cost changes", () => {
+    const activity = { label: "webfetch", observedAt: 592_000 };
+    const free = { ...value, session: { ...value.session, cost: 0 } };
+    const expensive = { ...value, session: { ...value.session, cost: 90.8436 } };
+    const expected = "  webfetch 8s ago                dur 10m";
+    expect(rowLines(free, undefined, 40, 600_000, activity).second).toBe(expected);
+    expect(rowLines(expensive, undefined, 40, 600_000, activity).second).toBe(expected);
+  });
+
+  test("omits active cost while preserving activity and duration", () => {
+    const activity = { label: "bash", observedAt: 7_000 };
+    const expensive = { ...value, session: { ...value.session, cost: 90.8436 } };
+    expect(rowLines(expensive, undefined, 19, 10_000, activity).second).toBe("  bash 3s ago");
+    expect(rowLines(expensive, undefined, 20, 10_000, activity).second).toBe(
+      "  b… 3s ago  dur 10s",
+    );
   });
 
   test("bounds status prefix at extremely narrow widths", () => {

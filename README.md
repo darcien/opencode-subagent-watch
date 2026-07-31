@@ -12,13 +12,13 @@ Example states:
 
 ```text
 * busy · Locate authentication flow
-  grep 8s ago · run 2m · $0.14
+  grep 8s ago                     dur 2m
   explore
 ~ retry · Fix flaky tests
-  run 40s
+  dur 40s
   builder
 ! error · Review patch
-  run 43s · $0.03
+  dur 43s · $0.03
   reviewer
 - idle · Map API routes
   $0.63

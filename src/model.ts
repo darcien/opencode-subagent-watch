@@ -28,9 +28,15 @@ export type ChildList = {
 const ACTIVE = new Set<SessionStatus["type"]>(["busy", "retry"]);
 const WHITESPACE = /\s+/g;
 const EMOJI_PRESENTATION = /\p{Emoji_Presentation}/u;
+const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const REGIONAL_INDICATOR = /\p{Regional_Indicator}/u;
 const EMOJI_VARIATION = /\ufe0f/u;
 const KEYCAP = /\u20e3/u;
+const FORMAT_CONTROL = /\p{Cf}/u;
+const ZERO_WIDTH_ONLY = /^[\p{Mark}\p{Cf}]+$/u;
+const EMOJI_JOIN_IGNORABLE = /[\p{Mark}\p{Emoji_Modifier}]/u;
+const EMOJI_TAG_SEQUENCE = /^\u{1f3f4}[\u{e0020}-\u{e007e}]+\u{e007f}$/u;
+const EMOJI_TAG_CHARACTER = /[\u{e0020}-\u{e007f}]/u;
 const SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function isActive(
@@ -91,10 +97,35 @@ export function retainError(child: ChildRecord, now: number): ChildRecord {
 }
 
 export function sanitizeText(value: string): string {
-  return [...value]
-    .filter((character) => {
-      const code = character.codePointAt(0) ?? 0;
-      return !(code <= 0x08 || (code >= 0x0b && code <= 0x1f) || (code >= 0x7f && code <= 0x9f));
+  return [...SEGMENTER.segment(value)]
+    .flatMap(({ segment }) => {
+      const characters = [...segment];
+      const emojiTagSequence = EMOJI_TAG_SEQUENCE.test(segment);
+      const joinedPictographs = (index: number) => {
+        const neighbor = (direction: -1 | 1) => {
+          let cursor = index + direction;
+          while (characters[cursor] && EMOJI_JOIN_IGNORABLE.test(characters[cursor]!))
+            cursor += direction;
+          return characters[cursor];
+        };
+        const previous = neighbor(-1);
+        const next = neighbor(1);
+        return (
+          !!previous &&
+          !!next &&
+          EXTENDED_PICTOGRAPHIC.test(previous) &&
+          EXTENDED_PICTOGRAPHIC.test(next)
+        );
+      };
+      return characters.filter((character, index) => {
+        const code = character.codePointAt(0) ?? 0;
+        const control =
+          code <= 0x08 || (code >= 0x0b && code <= 0x1f) || (code >= 0x7f && code <= 0x9f);
+        if (control) return false;
+        if (character === "\u200d") return joinedPictographs(index);
+        if (EMOJI_TAG_CHARACTER.test(character)) return emojiTagSequence;
+        return !FORMAT_CONTROL.test(character);
+      });
     })
     .join("")
     .replace(WHITESPACE, " ")
@@ -120,6 +151,7 @@ function isWide(codePoint: number): boolean {
 
 export function displayWidth(value: string): number {
   return [...SEGMENTER.segment(value)].reduce((width, { segment }) => {
+    if (ZERO_WIDTH_ONLY.test(segment)) return width;
     const emoji =
       EMOJI_PRESENTATION.test(segment) ||
       REGIONAL_INDICATOR.test(segment) ||
@@ -301,35 +333,51 @@ function fitFields(fields: readonly string[], width: number): string | undefined
   return line && displayWidth(line) <= width ? line : undefined;
 }
 
+function fitActivityColumns(
+  activity: { label: string; age: string },
+  duration: string,
+  width: number,
+): string | undefined {
+  const separator = "  ";
+  const activityWidth = width - displayWidth(`  ${separator}${duration}`);
+  const labelWidth = activityWidth - displayWidth(` ${activity.age}`);
+  if (labelWidth <= 0) return;
+
+  const label = truncateWidth(activity.label, labelWidth);
+  if (!label || (label === "…" && activity.label !== "…")) return;
+  const field = `${label} ${activity.age}`;
+  return `  ${field}${" ".repeat(Math.max(0, activityWidth - displayWidth(field)))}${separator}${duration}`;
+}
+
+function fitActivityOnly(
+  activity: { label: string; age: string },
+  width: number,
+): string | undefined {
+  const labelWidth = width - displayWidth(`   ${activity.age}`);
+  if (labelWidth > 0) {
+    const label = truncateWidth(activity.label, labelWidth);
+    if (label !== "…" || activity.label === "…") return `  ${label} ${activity.age}`;
+  }
+  return fitFields([activity.age], width);
+}
+
 function fitActiveDetails(
   activity: ActivityObservation | undefined,
   runtime: string | undefined,
-  cost: string | undefined,
   width: number,
   now: number,
 ): string | undefined {
   const observed = formatActivity(activity, now);
   if (!observed) {
-    const run = runtime ? `run ${runtime}` : undefined;
-    return fitFields([run ?? "", cost ?? ""], width) ?? fitFields([run ?? ""], width);
+    const duration = runtime ? `dur ${runtime}` : undefined;
+    return fitFields([duration ?? ""], width);
   }
 
-  const run = runtime ? `run ${runtime}` : undefined;
-  const fullWithoutCost = fitFields([`${observed.label} ${observed.age}`, run ?? ""], width);
-  const fullWithCost = cost
-    ? fitFields([`${observed.label} ${observed.age}`, run ?? "", cost], width)
-    : undefined;
-  if (fullWithCost) return fullWithCost;
-  if (fullWithoutCost) return fullWithoutCost;
-
-  const tail = [observed.age, run].filter((item): item is string => !!item).join(" · ");
-  const labelWidth = width - displayWidth(`   ${tail}`);
-  if (labelWidth > 0) return `  ${truncateWidth(observed.label, labelWidth)} ${tail}`;
-  const ageLabelWidth = width - displayWidth(`   ${observed.age}`);
-  if (ageLabelWidth > 0) {
-    return `  ${truncateWidth(observed.label, ageLabelWidth)} ${observed.age}`;
+  const duration = runtime ? `dur ${runtime}` : undefined;
+  if (duration) {
+    return fitActivityColumns(observed, duration, width) ?? fitActivityOnly(observed, width);
   }
-  return fitFields([observed.age, run ?? ""], width) ?? fitFields([observed.age], width);
+  return fitActivityOnly(observed, width);
 }
 
 function fitIdentity(agent: string, model: string | undefined, width: number): string | undefined {
@@ -349,10 +397,10 @@ function fitSettledDetails(
   cost: string | undefined,
   width: number,
 ): string | undefined {
-  const run = runtime ? `run ${runtime}` : undefined;
+  const duration = runtime ? `dur ${runtime}` : undefined;
   return (
-    fitFields([run ?? "", cost ?? ""], width) ??
-    fitFields([run ?? ""], width) ??
+    fitFields([duration ?? "", cost ?? ""], width) ??
+    fitFields([duration ?? ""], width) ??
     fitFields([cost ?? ""], width)
   );
 }
@@ -381,9 +429,9 @@ export function rowLines(
   const agent = sanitizeText(child.session.agent ?? "");
   const runtime = formatDuration(child.timing, now);
   const cost = formatCost(child.session.cost);
-  const model = differingModel(child.session.model, parentModel);
+  const model = sanitizeText(differingModel(child.session.model, parentModel) ?? "") || undefined;
   const second = isActive(child.status)
-    ? fitActiveDetails(activity, runtime, cost, width, now)
+    ? fitActiveDetails(activity, runtime, width, now)
     : fitSettledDetails(runtime, cost, width);
   const third = fitIdentity(agent, model, width);
 
