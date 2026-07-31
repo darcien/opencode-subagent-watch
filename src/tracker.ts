@@ -231,7 +231,9 @@ export class SubagentTracker {
   private onSessionChanged(session: Session, membershipChanged: boolean): void {
     const previous = this.records.get(session.id);
     if (session.parentID !== this.parentID && !previous) return;
-    if (membershipChanged) this.listGeneration++;
+    const visibleBefore = this.members.has(session.id);
+    const visibleAfter = session.parentID === this.parentID;
+    if (membershipChanged || visibleBefore !== visibleAfter) this.listGeneration++;
     const status = this.options.status(session.id);
     const now = this.now();
     const base: SubagentRecord = previous

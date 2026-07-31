@@ -191,6 +191,22 @@ describe("SubagentTracker", () => {
     tracker.dispose();
   });
 
+  test("keeps child first seen by update over older in-flight fetch", async () => {
+    const gate = deferred<Session[]>();
+    let calls = 0;
+    const tracker = new SubagentTracker({
+      fetchChildren: () => (++calls === 1 ? gate.promise : Promise.resolve([session("new")])),
+      status: () => undefined,
+    });
+    tracker.setParent("parent");
+    tracker.onUpdated(session("new"));
+    gate.resolve([]);
+    await gate.promise;
+    await tick();
+    expect(tracker.snapshot().children.has("new")).toBeTrue();
+    tracker.dispose();
+  });
+
   test("does not resurrect child deleted during in-flight fetch", async () => {
     const gate = deferred<Session[]>();
     const tracker = new SubagentTracker({
