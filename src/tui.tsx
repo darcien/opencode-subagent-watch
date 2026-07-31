@@ -1,4 +1,3 @@
-/** @jsxImportSource @opentui/solid */
 /**
  * Connects OpenCode subscriptions to Solid state and terminal rendering.
  */
