@@ -229,7 +229,7 @@ export function formatDuration(timing: RunTiming | undefined, now: number): stri
 }
 
 export function formatCost(cost: number | undefined): string | undefined {
-  if (!cost || cost <= 0) return;
+  if (!cost || cost <= 0 || !Number.isFinite(cost)) return;
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 }
@@ -284,13 +284,77 @@ export type RowLines = {
   third?: string;
 };
 
-export function formatActivity(
+function formatActivity(
   activity: ActivityObservation | undefined,
   now: number,
-): string | undefined {
+): { label: string; age: string } | undefined {
   if (!activity) return;
   const age = formatDuration({ startedAt: activity.observedAt, endedAt: now }, now);
-  return `${sanitizeText(activity.label)} ${age} ago`;
+  const label = sanitizeText(activity.label);
+  if (!label || !age) return;
+  return { label, age: `${age} ago` };
+}
+
+function fitFields(fields: readonly string[], width: number): string | undefined {
+  const values = fields.filter(Boolean);
+  const line = values.length ? `  ${values.join(" · ")}` : "";
+  return line && displayWidth(line) <= width ? line : undefined;
+}
+
+function fitActiveDetails(
+  activity: ActivityObservation | undefined,
+  runtime: string | undefined,
+  cost: string | undefined,
+  width: number,
+  now: number,
+): string | undefined {
+  const observed = formatActivity(activity, now);
+  if (!observed) {
+    const run = runtime ? `run ${runtime}` : undefined;
+    return fitFields([run ?? "", cost ?? ""], width) ?? fitFields([run ?? ""], width);
+  }
+
+  const run = runtime ? `run ${runtime}` : undefined;
+  const fullWithoutCost = fitFields([`${observed.label} ${observed.age}`, run ?? ""], width);
+  const fullWithCost = cost
+    ? fitFields([`${observed.label} ${observed.age}`, run ?? "", cost], width)
+    : undefined;
+  if (fullWithCost) return fullWithCost;
+  if (fullWithoutCost) return fullWithoutCost;
+
+  const tail = [observed.age, run].filter((item): item is string => !!item).join(" · ");
+  const labelWidth = width - displayWidth(`   ${tail}`);
+  if (labelWidth > 0) return `  ${truncateWidth(observed.label, labelWidth)} ${tail}`;
+  const ageLabelWidth = width - displayWidth(`   ${observed.age}`);
+  if (ageLabelWidth > 0) {
+    return `  ${truncateWidth(observed.label, ageLabelWidth)} ${observed.age}`;
+  }
+  return fitFields([observed.age, run ?? ""], width) ?? fitFields([observed.age], width);
+}
+
+function fitIdentity(agent: string, model: string | undefined, width: number): string | undefined {
+  if (!agent) return model && width > 2 ? `  ${truncateWidth(model, width - 2)}` : undefined;
+  const full = model ? fitFields([agent, model], width) : fitFields([agent], width);
+  if (full) return full;
+  if (!model) return width > 2 ? `  ${truncateWidth(agent, width - 2)}` : undefined;
+
+  const modelPrefix = " · ";
+  const modelWidth = width - displayWidth(`  ${agent}${modelPrefix}`);
+  if (modelWidth > 0) return `  ${agent}${modelPrefix}${truncateWidth(model, modelWidth)}`;
+  return width > 2 ? `  ${truncateWidth(agent, width - 2)}` : undefined;
+}
+
+function fitSettledDetails(
+  runtime: string | undefined,
+  cost: string | undefined,
+  width: number,
+): string | undefined {
+  const run = runtime ? `run ${runtime}` : undefined;
+  return (
+    fitFields([run ?? "", cost ?? ""], width) ??
+    fitFields([run ?? ""], width) ??
+    fitFields([cost ?? ""], width)
+  );
 }
 
 export function rowLines(
@@ -307,36 +371,21 @@ export function rowLines(
     error: "!",
     idle: "-",
   };
+  const fullTitle = displayTitle(child.session);
+  const statusPrefix = `${symbol[status]} ${status}`;
   const fullPrefix = `${symbol[status]} ${status} · `;
-  const prefix = truncateWidth(fullPrefix, width);
-  const title =
-    displayWidth(fullPrefix) < width
-      ? truncateWidth(displayTitle(child.session), width - displayWidth(fullPrefix))
-      : "";
+  const showTitle = !!fullTitle && displayWidth(fullPrefix) < width;
+  const prefix = showTitle ? fullPrefix : truncateWidth(statusPrefix, width);
+  const title = showTitle ? truncateWidth(fullTitle, width - displayWidth(fullPrefix)) : "";
   const first = prefix + title;
   const agent = sanitizeText(child.session.agent ?? "");
-  const recentActivity = isActive(child.status)
-    ? (formatActivity(activity, now) ?? "active")
-    : undefined;
-  const context = [agent || undefined, recentActivity].filter((item): item is string => !!item);
   const runtime = formatDuration(child.timing, now);
   const cost = formatCost(child.session.cost);
   const model = differingModel(child.session.model, parentModel);
-  const second = context.length ? truncateWidth(`  ${context.join(" · ")}`, width) : undefined;
-  const details = [runtime ? `run ${runtime}` : undefined, cost].filter(
-    (item): item is string => !!item,
-  );
-  const fittingDetails = details.filter(
-    (_, index) => displayWidth(`  ${details.slice(0, index + 1).join(" · ")}`) <= width,
-  );
-  const detailPrefix = fittingDetails.length ? `  ${fittingDetails.join(" · ")}` : "";
-  const modelPrefix = detailPrefix ? " · " : "  ";
-  const modelWidth = width - displayWidth(detailPrefix + modelPrefix);
-  const visibleModel = model && modelWidth > 0 ? truncateWidth(model, modelWidth) : undefined;
-  const third =
-    detailPrefix || visibleModel
-      ? detailPrefix + (visibleModel ? modelPrefix + visibleModel : "")
-      : undefined;
+  const second = isActive(child.status)
+    ? fitActiveDetails(activity, runtime, cost, width, now)
+    : fitSettledDetails(runtime, cost, width);
+  const third = fitIdentity(agent, model, width);
 
   return { first: truncateWidth(first, width), prefix, title, second, third };
 }

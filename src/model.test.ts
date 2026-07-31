@@ -6,6 +6,7 @@ import {
   differingModel,
   displayStatus,
   displayTitle,
+  formatCost,
   formatDuration,
   headerLine,
   headerSegments,
@@ -180,7 +181,7 @@ describe("responsive lines", () => {
       expect(displayWidth(lines.third ?? "")).toBeLessThanOrEqual(width);
       expect(lines.first).toContain("busy");
       expect(lines.first).toStartWith("* busy · ");
-      expect(lines.second).toContain("investigator");
+      expect(lines.third).toContain("investigator");
     });
   }
 
@@ -197,14 +198,81 @@ describe("responsive lines", () => {
     ]);
   });
 
-  test("splits activity from run details so cost remains visible", () => {
+  test("groups activity with run details and identity separately", () => {
     const lines = rowLines(value, undefined, 40, 600_000, {
       label: "grep",
       observedAt: 592_000,
     });
-    expect(lines.second).toBe("  investigator · grep 8s ago");
-    expect(lines.third).toBe("  run 10m · $0.14 · provider/model");
-    expect(rowLines(value, undefined, 12, 600_000).third).not.toContain("$0.…");
+    expect(lines.second).toBe("  grep 8s ago · run 10m · $0.14");
+    expect(lines.third).toBe("  investigator · provider/model");
+    expect(rowLines(value, undefined, 12, 600_000).second).not.toContain("$0.…");
+  });
+
+  test.each([
+    [24, "  svel… 3s ago · run 10s", "  cavecrew-investigator"],
+    [32, "  svelte_get-d… 3s ago · run 10s", "  cavecrew-investigator · openr…"],
+    [40, "  svelte_get-documenta… 3s ago · run 10s", "  cavecrew-investigator · openrouter/de…"],
+  ] as const)("fits real long tool and agent data at width %i", (width, second, third) => {
+    const real = {
+      ...child(
+        "real",
+        { type: "busy" },
+        {
+          title: "Audit questionnaire flow",
+          agent: "cavecrew-investigator",
+          model: { providerID: "openrouter", id: "deepseek-v3.2" },
+          cost: 1.28,
+        },
+      ),
+      timing: { startedAt: 0 },
+    };
+    const lines = rowLines(
+      real,
+      { providerID: "github-copilot", id: "gpt-5.6-sol" },
+      width,
+      10_000,
+      { label: "svelte_get-documentation", observedAt: 7_000 },
+    );
+    expect(lines.second).toBe(second);
+    expect(lines.third).toBe(third);
+  });
+
+  test("shows settled runtime and real high cost without partial fields", () => {
+    const settled = {
+      ...child("settled", { type: "idle" }, { agent: "svelte-file-editor", cost: 90.8436 }),
+      timing: { startedAt: 0, endedAt: 46_000 },
+    };
+    expect(rowLines(settled, undefined, 24, 60_000).second).toBe("  run 46s · $90.84");
+    expect(rowLines(settled, undefined, 24, 60_000).third).toBe("  svelte-file-editor");
+    expect(formatCost(Number.POSITIVE_INFINITY)).toBeUndefined();
+  });
+
+  test("bounds every row line for all narrow widths", () => {
+    for (let width = 0; width <= 40; width++) {
+      const lines = rowLines(value, undefined, width, 600_000, {
+        label: "svelte_svelte-autofixer",
+        observedAt: 592_000,
+      });
+      for (const line of [lines.first, lines.second, lines.third]) {
+        expect(displayWidth(line ?? "")).toBeLessThanOrEqual(width);
+        expect(line ?? "").not.toMatch(/ · $/);
+      }
+      expect(lines.second ?? "").not.toContain("$0.…");
+    }
+  });
+
+  test("shows runtime without redundant active fallback", () => {
+    expect(rowLines(value, undefined, 10, 600_000).second).toBe("  run 10m");
+    expect(rowLines(value, undefined, 32, 600_000).second).toBe("  run 10m · $0.14");
+  });
+
+  test("keeps activity label before runtime under tight width", () => {
+    expect(
+      rowLines(value, undefined, 17, 600_000, {
+        label: "svelte_get-documentation",
+        observedAt: 592_000,
+      }).second,
+    ).toBe("  svelte_… 8s ago");
   });
 
   test("bounds status prefix at extremely narrow widths", () => {

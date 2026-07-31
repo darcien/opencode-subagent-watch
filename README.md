@@ -12,17 +12,17 @@ Example states:
 
 ```text
 * busy · Locate authentication flow
-  explore · grep 8s ago
-  run 2m · $0.14
+  grep 8s ago · run 2m · $0.14
+  explore
 ~ retry · Fix flaky tests
-  builder · active
   run 40s
+  builder
 ! error · Review patch
-  reviewer
   run 43s · $0.03
+  reviewer
 - idle · Map API routes
-  general
-  $0.63 · openrouter/deepseek-v3.2
+  $0.63
+  general · openrouter/deepseek-v3.2
 ```
 
 Tested with OpenCode 1.18.9.

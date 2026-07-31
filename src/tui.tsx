@@ -2,7 +2,7 @@
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui";
 import type { BoxRenderable, RGBA } from "@opentui/core";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { clearActivity, observeActivity, touchActivity, type ActivityMap } from "./activity";
+import { clearActivity, updateActivity, type ActivityMap } from "./activity";
 import { ChildController, type Snapshot } from "./controller";
 import {
   displayStatus,
@@ -233,47 +233,20 @@ const tui: TuiPlugin = async (api) => {
     }
   });
 
-  const observe = (sessionID: string, label: string, timestamp: number) => {
-    if (!snapshot().children.has(sessionID)) return;
-    setActivities((value) => observeActivity(value, sessionID, label, timestamp));
-  };
-  const touch = (sessionID: string, timestamp: number) => {
-    if (!snapshot().children.has(sessionID)) return;
-    const previous = activities().get(sessionID);
-    if (!previous || !Number.isFinite(timestamp) || timestamp - previous.observedAt < 1_000) return;
-    setActivities((value) => touchActivity(value, sessionID, timestamp));
-  };
-
-  api.event.on("session.next.step.started", (event) =>
-    observe(event.properties.sessionID, "thinking", event.properties.timestamp),
-  );
-  api.event.on("session.next.reasoning.started", (event) =>
-    observe(event.properties.sessionID, "thinking", event.properties.timestamp),
-  );
-  api.event.on("session.next.text.started", (event) =>
-    observe(event.properties.sessionID, "writing", event.properties.timestamp),
-  );
-  api.event.on("session.next.tool.input.started", (event) =>
-    observe(event.properties.sessionID, event.properties.name, event.properties.timestamp),
-  );
-  api.event.on("session.next.tool.called", (event) =>
-    observe(event.properties.sessionID, event.properties.tool, event.properties.timestamp),
-  );
-  api.event.on("session.next.shell.started", (event) =>
-    observe(event.properties.sessionID, "shell", event.properties.timestamp),
-  );
-  api.event.on("session.next.reasoning.delta", (event) =>
-    touch(event.properties.sessionID, event.properties.timestamp),
-  );
-  api.event.on("session.next.text.delta", (event) =>
-    touch(event.properties.sessionID, event.properties.timestamp),
-  );
-  api.event.on("session.next.tool.input.delta", (event) =>
-    touch(event.properties.sessionID, event.properties.timestamp),
-  );
-  api.event.on("session.next.tool.progress", (event) =>
-    touch(event.properties.sessionID, event.properties.timestamp),
-  );
+  api.event.on("message.part.updated", (event) => {
+    const { sessionID, part, time } = event.properties;
+    const child = snapshot().children.get(sessionID);
+    if (!child || !isActive(child.status)) return;
+    // Measured 2026-07-31 on 1.18.9: text was 4.5% of part events; each text part caused at most two message scans. Keep uncached for now.
+    const messageRole =
+      part.type === "text"
+        ? api.state.session.messages(sessionID).findLast((message) => message.id === part.messageID)
+            ?.role
+        : undefined;
+    const current = activities();
+    const next = updateActivity(current, sessionID, part, time, messageRole);
+    if (next !== current) setActivities(next);
+  });
 
   api.slots.register({
     order: 450,
