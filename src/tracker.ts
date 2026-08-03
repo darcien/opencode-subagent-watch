@@ -3,6 +3,7 @@
  */
 import type { Session, SessionStatus } from "@opencode-ai/sdk/v2";
 import {
+  cancelSubagent,
   normalizeStatus,
   startObservedTiming,
   retainError,
@@ -30,7 +31,14 @@ export type TrackerOptions = {
 
 type LifecycleEvent =
   | { type: "status"; sessionID: string; status: SessionStatus; now: number }
-  | { type: "error"; sessionID: string; now: number };
+  | { type: "error"; sessionID: string; now: number }
+  | { type: "cancel"; sessionID: string; now: number };
+
+function isAbortedError(error: unknown): boolean {
+  return (
+    !!error && typeof error === "object" && "name" in error && error.name === "MessageAbortedError"
+  );
+}
 
 function setRecord(
   records: ReadonlyMap<string, SubagentRecord>,
@@ -55,7 +63,9 @@ function applyLifecycle(
   const next =
     event.type === "status"
       ? updateStatus(previous, event.status, event.now)
-      : retainError(previous, event.now);
+      : event.type === "cancel"
+        ? cancelSubagent(previous, event.now)
+        : retainError(previous, event.now);
   return setRecord(records, next);
 }
 
@@ -285,7 +295,11 @@ export class SubagentTracker {
     }
 
     const record = this.records.get(sessionID);
-    const event: LifecycleEvent = { type: "error", sessionID, now: this.now() };
+    const event: LifecycleEvent = {
+      type: isAbortedError(error) ? "cancel" : "error",
+      sessionID,
+      now: this.now(),
+    };
     if (record) {
       this.records = applyLifecycle(this.records, event);
       if (this.members.has(sessionID)) this.emit();

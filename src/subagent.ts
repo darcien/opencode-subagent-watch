@@ -78,3 +78,8 @@ export function retainError(subagent: SubagentRecord, now: number): SubagentReco
       : subagent.timing;
   return { ...subagent, status: { type: "idle" }, errorAt: now, timing };
 }
+
+export function cancelSubagent(subagent: SubagentRecord, now: number): SubagentRecord {
+  if (!isActive(subagent.status)) return subagent;
+  return { ...updateStatus(subagent, { type: "idle" }, now), errorAt: undefined };
+}

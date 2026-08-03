@@ -90,6 +90,38 @@ describe("SubagentTracker", () => {
     tracker.dispose();
   });
 
+  test("treats aborted child as cancelled instead of retained error", async () => {
+    let now = 10;
+    const tracker = new SubagentTracker({
+      fetchChildren: async () => [session("a")],
+      status: () => ({ type: "busy" }),
+      now: () => now,
+    });
+    await tracker.setParent("parent");
+    now = 20;
+    tracker.onError("a", { name: "MessageAbortedError", data: { message: "Aborted" } });
+    const value = tracker.snapshot().children.get("a")!;
+    expect(displayStatus(value)).toBe("idle");
+    expect(value.errorAt).toBeUndefined();
+    expect(value.timing).toEqual({ startedAt: 10, endedAt: 20 });
+    tracker.dispose();
+  });
+
+  test("buffers child cancellation received before ownership fetch", async () => {
+    const gate = deferred<Session[]>();
+    const tracker = new SubagentTracker({
+      fetchChildren: () => gate.promise,
+      status: () => ({ type: "busy" }),
+    });
+    tracker.setParent("parent");
+    tracker.onError("a", { name: "MessageAbortedError", data: { message: "Aborted" } });
+    gate.resolve([session("a")]);
+    await gate.promise;
+    await tick();
+    expect(displayStatus(tracker.snapshot().children.get("a")!)).toBe("idle");
+    tracker.dispose();
+  });
+
   test("early active status clears earlier buffered error", async () => {
     const gate = deferred<Session[]>();
     const tracker = new SubagentTracker({

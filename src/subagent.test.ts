@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Session, SessionStatus } from "@opencode-ai/sdk/v2";
 import {
+  cancelSubagent,
   displayStatus,
   retainError,
   startObservedTiming,
@@ -43,5 +44,11 @@ describe("subagent lifecycle", () => {
   test("starts timing when an active subagent is first observed", () => {
     const value = startObservedTiming(subagent("a", { type: "busy" }), 1_000);
     expect(value.timing).toEqual({ startedAt: 1_000 });
+  });
+
+  test("does not clear a retained error on later cancellation", () => {
+    const failed = retainError(updateStatus(subagent("a"), { type: "busy" }, 10), 20);
+    expect(cancelSubagent(failed, 30)).toBe(failed);
+    expect(displayStatus(failed)).toBe("error");
   });
 });
