@@ -50,13 +50,13 @@ Also, no dependencies, ever.
 Install:
 
 ```shell
-opencode plugin --global opencode-subagent-watch@0.3.0
+opencode plugin --global opencode-subagent-watch@0.3.1
 ```
 
 Upgrade:
 
 ```shell
-opencode plugin --global --force opencode-subagent-watch@0.3.0
+opencode plugin --global --force opencode-subagent-watch@0.3.1
 ```
 
 <!-- x-release-please-end -->
