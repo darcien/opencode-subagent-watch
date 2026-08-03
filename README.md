@@ -38,7 +38,7 @@ This plugin is minimal in all aspects, and I will keep it that way.
 
 ```shell
 $ du -sh dist/
- 32K    dist/
+ 36K    dist/
 ```
 
 Also, no dependencies, ever.
@@ -47,14 +47,15 @@ Also, no dependencies, ever.
 
 <!-- x-release-please-start-version -->
 
-```bash
-# Latest
-opencode plugin --global opencode-subagent-watch@latest
+Install:
 
-# Pinned
+```shell
 opencode plugin --global opencode-subagent-watch@0.3.0
+```
 
-# Upgrade a pinned install
+Upgrade:
+
+```shell
 opencode plugin --global --force opencode-subagent-watch@0.3.0
 ```
 
@@ -79,7 +80,7 @@ bun run build
 Test the built plugin from either OpenCode config scope:
 
 - Global config: `~/.config/opencode/tui.jsonc`.
-- Project config: `.opencode/tui.json`.
+- Project config: `tui.json` in the project root.
 
 Append the absolute path to the `plugin` array:
 
