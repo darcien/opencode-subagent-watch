@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/darcien/opencode-subagent-watch/compare/v0.3.0...v0.3.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* stop retaining aborted subagent errors ([8a31dca](https://github.com/darcien/opencode-subagent-watch/commit/8a31dca14b2f48c1fe7f743fc6dca822bd1e5cde))
+
 ## [0.3.0](https://github.com/darcien/opencode-subagent-watch/compare/v0.2.1...v0.3.0) (2026-07-31)
 
 
