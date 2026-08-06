@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/darcien/opencode-subagent-watch/compare/v0.3.1...v0.4.0) (2026-08-06)
+
+
+### Features
+
+* highlight subagent rows on hover ([693fd84](https://github.com/darcien/opencode-subagent-watch/commit/693fd8406265771b29248fad48cdae84db61bf0f))
+
 ## [0.3.1](https://github.com/darcien/opencode-subagent-watch/compare/v0.3.0...v0.3.1) (2026-08-03)
 
 
