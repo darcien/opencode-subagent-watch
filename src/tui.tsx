@@ -41,6 +41,7 @@ function View(props: {
 }) {
   const [width, setWidth] = createSignal(40);
   const [now, setNow] = createSignal(Date.now());
+  const [hovered, setHovered] = createSignal<string>();
   let root: BoxRenderable | undefined;
 
   createEffect(() => props.ensureKV());
@@ -48,6 +49,15 @@ function View(props: {
   else void props.tracker.setParent(props.sessionID);
 
   const list = createMemo(() => sortAndPrune(props.snapshot().children.values()));
+  createEffect(() => {
+    const hoveredID = hovered();
+    if (
+      hoveredID &&
+      (props.collapsed() || !list().visible.some((child) => child.session.id === hoveredID))
+    ) {
+      setHovered(undefined);
+    }
+  });
   const parentModel = createMemo(() =>
     resolveSessionModel(
       props.api.state.session.get(props.sessionID),
@@ -130,6 +140,8 @@ function View(props: {
 
         <For each={list().visible}>
           {(child) => {
+            const isHovered = () => hovered() === child.session.id;
+            const status = () => displayStatus(child);
             const lines = () =>
               rowLines(
                 child,
@@ -142,19 +154,58 @@ function View(props: {
               <box
                 width="100%"
                 flexDirection="column"
+                onMouseOver={() => setHovered(child.session.id)}
+                onMouseOut={() => setHovered(undefined)}
                 onMouseUp={() => navigate(props.api, child.session.id)}
               >
                 <text>
-                  <span style={{ fg: statusColor(props.api, displayStatus(child)) }}>
-                    {lines().prefix}
+                  <span
+                    style={{
+                      fg:
+                        isHovered() && status() === "idle"
+                          ? props.api.theme.current.text
+                          : statusColor(props.api, status()),
+                    }}
+                  >
+                    <Show when={isHovered()} fallback={lines().prefix}>
+                      <b>{lines().prefix}</b>
+                    </Show>
                   </span>
-                  <span style={{ fg: props.api.theme.current.text }}>{lines().title}</span>
+                  <span
+                    style={{
+                      fg: isHovered()
+                        ? props.api.theme.current.text
+                        : props.api.theme.current.textMuted,
+                    }}
+                  >
+                    {lines().title}
+                  </span>
                 </text>
                 <Show when={lines().second} keyed>
-                  {(second: string) => <text fg={props.api.theme.current.textMuted}>{second}</text>}
+                  {(second: string) => (
+                    <text
+                      fg={
+                        isHovered()
+                          ? props.api.theme.current.text
+                          : props.api.theme.current.textMuted
+                      }
+                    >
+                      {second}
+                    </text>
+                  )}
                 </Show>
                 <Show when={lines().third} keyed>
-                  {(third: string) => <text fg={props.api.theme.current.textMuted}>{third}</text>}
+                  {(third: string) => (
+                    <text
+                      fg={
+                        isHovered()
+                          ? props.api.theme.current.text
+                          : props.api.theme.current.textMuted
+                      }
+                    >
+                      {third}
+                    </text>
+                  )}
                 </Show>
               </box>
             );
